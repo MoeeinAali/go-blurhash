@@ -15,4 +15,4 @@ var (
 	ErrInvalidDimensions = errors.New("blurhash: width and height must be > 0")
 	// ErrInvalidCharacter indicates unsupported characters in base83 strings.
 	ErrInvalidCharacter = errors.New("blurhash: invalid base83 character")
-}
+)
