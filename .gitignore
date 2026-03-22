@@ -34,7 +34,6 @@ cmd/blurhash/blurhash
 
 # Generated files
 /tmp/
-*.png
 output.*
 
 # Node modules (if needed)
