@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/base64"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -10,6 +8,7 @@ import (
 	"image/png"
 	_ "image/png"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/moeeinaali/go-blurhash"
@@ -19,6 +18,7 @@ const (
 	readmePath  = "README.md"
 	startMarker = "<!-- GENERATED_OUTPUT_MATRIX_START -->"
 	endMarker   = "<!-- GENERATED_OUTPUT_MATRIX_END -->"
+	outputDir   = "docs/generated/output-matrix"
 )
 
 type componentPair struct {
@@ -65,7 +65,7 @@ func generateContent(imagePaths []string, sizes []int, components []componentPai
 	b.WriteString("Rendering notes:\n")
 	b.WriteString("- each image is decoded at its real size (8x8 or 128x128)\n")
 	b.WriteString("- each image is displayed in README at 300x300 pixels\n")
-	b.WriteString("- image src is embedded as base64 PNG data URL\n")
+	b.WriteString("- image src points to generated PNG files in docs/generated/output-matrix\n")
 
 	for _, imgPath := range imagePaths {
 		img, err := readImage(imgPath)
@@ -78,6 +78,8 @@ func generateContent(imagePaths []string, sizes []int, components []componentPai
 		bounds := img.Bounds()
 		b.WriteString(fmt.Sprintf("Original image (real size: %dx%d, display: 300x300)\n\n", bounds.Dx(), bounds.Dy()))
 		b.WriteString(fmt.Sprintf("<img src=\"%s\" alt=\"original %s\" width=\"300\" height=\"300\" style=\"object-fit:contain;\" />\n\n", imgPath, imgPath))
+
+		name := strings.TrimSuffix(filepath.Base(imgPath), filepath.Ext(imgPath))
 
 		for _, size := range sizes {
 			row := make([]renderedCell, 0, len(components))
@@ -92,14 +94,19 @@ func generateContent(imagePaths []string, sizes []int, components []componentPai
 					return "", fmt.Errorf("decode failed for %s size=%d x=%d y=%d: %w", imgPath, size, c.x, c.y, err)
 				}
 
-				dataURL, err := pngDataURL(decoded)
+				relPath := filepath.ToSlash(filepath.Join(outputDir, name, fmt.Sprintf("size-%d-x-%d-y-%d.png", size, c.x, c.y)))
+				if err := writePNG(relPath, decoded); err != nil {
+					return "", fmt.Errorf("write png failed for %s size=%d x=%d y=%d: %w", imgPath, size, c.x, c.y, err)
+				}
+
+				_, err = os.Stat(relPath)
 				if err != nil {
-					return "", fmt.Errorf("png base64 failed for %s size=%d x=%d y=%d: %w", imgPath, size, c.x, c.y, err)
+					return "", fmt.Errorf("verify png failed for %s size=%d x=%d y=%d: %w", imgPath, size, c.x, c.y, err)
 				}
 
 				row = append(row, renderedCell{
 					Label: fmt.Sprintf("x=%d y=%d", c.x, c.y),
-					Data:  dataURL,
+					Data:  relPath,
 				})
 			}
 
@@ -139,13 +146,18 @@ func renderHTMLGrid(rows [][]renderedCell, imagePath string, size int) string {
 	return b.String()
 }
 
-func pngDataURL(img image.Image) (string, error) {
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		return "", err
+func writePNG(path string, img image.Image) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
 	}
-	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
-	return "data:image/png;base64," + encoded, nil
+
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return png.Encode(f, img)
 }
 
 func readImage(path string) (image.Image, error) {
