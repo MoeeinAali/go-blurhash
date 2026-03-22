@@ -27,8 +27,9 @@ type componentPair struct {
 }
 
 type renderedCell struct {
-	Label string
-	Data  string
+	Label      string
+	Data       string
+	HashLength int
 }
 
 func main() {
@@ -105,8 +106,9 @@ func generateContent(imagePaths []string, sizes []int, components []componentPai
 				}
 
 				row = append(row, renderedCell{
-					Label: fmt.Sprintf("x=%d y=%d", c.x, c.y),
-					Data:  relPath,
+					Label:      fmt.Sprintf("x=%d y=%d", c.x, c.y),
+					Data:       relPath,
+					HashLength: len(hash),
 				})
 			}
 
@@ -135,7 +137,7 @@ func renderHTMLGrid(rows [][]renderedCell, imagePath string, size int) string {
 		b.WriteString(fmt.Sprintf("    <tr><th>row-%d</th>", rowIdx+1))
 		for _, cell := range row {
 			alt := fmt.Sprintf("%s size %d %s", imagePath, size, cell.Label)
-			b.WriteString(fmt.Sprintf("<td><img src=\"%s\" alt=\"%s\" width=\"300\" height=\"300\" style=\"object-fit:contain; image-rendering: pixelated;\" /></td>", cell.Data, alt))
+			b.WriteString(fmt.Sprintf("<td><img src=\"%s\" alt=\"%s\" width=\"300\" height=\"300\" style=\"object-fit:contain; image-rendering: pixelated;\" /><br/><small>hash length: %d</small></td>", cell.Data, alt, cell.HashLength))
 		}
 		b.WriteString("</tr>\n")
 	}
